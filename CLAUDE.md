@@ -5,10 +5,11 @@
 
 ## Architecture
 - **Runtime:** Bun (TypeScript)
-- **Framework:** `@opencode-ai/plugin` plugin hooks.
-- **Dependency Policy:** Zero external npm dependencies. Uses native JS/TS features and Bun built-ins only.
+- **Framework:** OpenCode plugin hooks (via default export).
+- **Dependency Policy:** Zero external npm dependencies at runtime. Uses native JS/TS features and Bun built-ins only.
 - **Key Files:**
   - `secret-masker.ts` contains both the plugin hooks and masking logic (single-file plugin). This file is intended to be copied/symlinked into a project's `.opencode/plugins/` directory.
+  - `package.json` provides npm publish metadata and build scripts.
 
 ## Hook Coverage
 
@@ -20,15 +21,20 @@
 doc: <https://github.com/anomalyco/opencode/blob/dev/packages/web/src/content/docs/plugins.mdx>
 
 ### Commands
-Since this is a single-file plugin, there is no `package.json` build script.
+Since this is a single-file plugin, there is no framework build step beyond `bun build`.
 
 - **Run Tests:**
   ```bash
   bun test
   ```
 
+- **Build (for npm publish):**
+  ```bash
+  bun run build
+  ```
+
 ### Code Style Guidelines
-- **Imports:** strict imports from `@opencode-ai/plugin`.
+- **Imports:** avoid runtime imports; keep the plugin self-contained.
 - **Regex:** Keep `DETECTORS` conservative and prefer high-confidence patterns.
 - **Formatting:** Standard TypeScript formatting.
 - **Safety:**

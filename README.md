@@ -39,6 +39,23 @@ mkdir -p ~/.config/opencode/plugins
 cp secret-masker.ts ~/.config/opencode/plugins/secret-masker.ts
 ```
 
+### 3. Install via npm (recommended)
+
+If you publish/install this plugin from npm, add it to your OpenCode config:
+
+`opencode.json`
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@pratikbin/opencode-secret-masker@latest"]
+}
+```
+
+OpenCode will install/load the package and run the plugin's default export.
+
+Note: OpenCode currently imports npm plugins via a directory path. This package includes a root `index.js` entrypoint for compatibility.
+
 ## Usage
 
 Once installed, OpenCode loads the plugin automatically at startup.
@@ -77,42 +94,21 @@ bun test
 
 2. Restart OpenCode so it reloads plugins.
 
-3. (Optional) Point audit logging to a temporary file so you can inspect it easily:
+3. Test it out by sending a message with a fake secret:
 
 ```bash
-export SECRET_MASKER_AUDIT_PATH="$HOME/.config/opencode/secret-masker.audit.jsonl"
 export SECRET_MASKER_AUDIT_ENABLED=1
-```
-
-If you want the log to live in your current project for testing:
-
-```bash
 export SECRET_MASKER_AUDIT_PATH="$PWD/secret-masker.audit.jsonl"
-```
+rm -f "$SECRET_MASKER_AUDIT_PATH"
 
-4. Send a message containing a known token pattern:
+# In another terminal, watch the audit log:
+# tail -f "$SECRET_MASKER_AUDIT_PATH"
 
-```bash
-opencode run "my aws key is AKIAIOSFODNN7EXAMPLE"
-```
-
-5. Verify:
-   - The message in the session UI/history should show `<SECRET: AWSKeyDetector>` (or similar) instead of the raw token.
-   - The audit file should have a new JSON line:
-
-```bash
-tail -n 3 "$HOME/.config/opencode/secret-masker.audit.jsonl"
-```
-
-6. Verify tool-output masking (optional, stronger test):
-   - Create a file that contains a known secret pattern, then ask OpenCode to read it.
-   - The `read` tool output should be masked by `tool.execute.after`, and the audit log should show detector counts.
-
-Example:
-
-```bash
 echo "AKIAIOSFODNN7EXAMPLE" > secret-test.txt
 opencode run "Read secret-test.txt and tell me what it contains"
+
+# Then verify audit output:
+cat "$SECRET_MASKER_AUDIT_PATH"
 ```
 
 ## Configuration

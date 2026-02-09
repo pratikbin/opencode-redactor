@@ -1,5 +1,40 @@
 {
-  "dependencies": {
-    "@opencode-ai/plugin": "1.1.53"
+  "name": "@pratikbin/opencode-secret-masker",
+  "version": "0.1.1",
+  "description": "OpenCode plugin to mask secrets and high-entropy strings before sending to LLM providers",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build secret-masker.ts --outdir dist --format esm --target node",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "secrets",
+    "masking"
+  ],
+  "license": "MIT",
+  "author": "pratikbin",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
