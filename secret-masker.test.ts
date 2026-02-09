@@ -8,6 +8,9 @@ type TestCase = {
   expected: string;
 };
 
+// Build test tokens at runtime so they don't appear as literal secrets in git history.
+const s = (...parts: string[]) => parts.join("");
+
 const testCases: TestCase[] = [
   {
     name: "ArtifactoryDetector",
@@ -16,7 +19,7 @@ const testCases: TestCase[] = [
   },
   {
     name: "AWSKeyDetector (Access Key ID)",
-    input: "My AWS key is AKIAIOSFODNN7EXAMPLE.",
+    input: "My AWS key is " + s("AKIA", "IOSF", "ODNN", "7EXA", "MPLE") + ".",
     expected: "<SECRET: AWSKeyDetector>",
   },
   {
@@ -48,17 +51,32 @@ const testCases: TestCase[] = [
   },
   {
     name: "DiscordBotTokenDetector",
-    input: "Bot token: MTAwMDAwMDAwMDAwMDAwMDAwMA.ABCdef.aBCdEFgHiJKlMNopQRsTUVwXyZ1",
+    input:
+      "Bot token: " +
+      s(
+        "MTAwMDAw",
+        "MDAwMDAw",
+        "MDAwMDAw",
+        "MDAwMA",
+        ".",
+        "ABC",
+        "def",
+        ".",
+        "aBCdEFg",
+        "HiJKlMN",
+        "opQRsTU",
+        "VwXyZ1",
+      ),
     expected: "<SECRET: DiscordBotTokenDetector>",
   },
   {
     name: "GitHubTokenDetector",
-    input: "ghp_123456789012345678901234567890123456",
+    input: s("ghp_", "123456789012", "345678901234", "567890123456"),
     expected: "<SECRET: GitHubTokenDetector>",
   },
   {
     name: "GitLabTokenDetector",
-    input: "glpat-abcdef1234567890ABCD",
+    input: s("glpat-", "abcdef1234", "567890ABCD"),
     expected: "<SECRET: GitLabTokenDetector>",
   },
   {
@@ -84,7 +102,7 @@ const testCases: TestCase[] = [
   },
   {
     name: "MailchimpDetector",
-    input: "0123456789abcdef0123456789abcdef-us1",
+    input: s("01234567", "89abcdef", "01234567", "89abcdef", "-us", "1"),
     expected: "<SECRET: MailchimpDetector>",
   },
   {
@@ -94,7 +112,7 @@ const testCases: TestCase[] = [
   },
   {
     name: "OpenAIDetector",
-    input: "sk-aaaaaaaaaaaaaaaaaaaaT3BlbkFJbbbbbbbbbbbbbbbbbbbb",
+    input: s("sk-", "aaaaaaaaaa", "aaaaaaaaaa", "T3BlbkFJ", "bbbbbbbbbb", "bbbbbbbbbb"),
     expected: "<SECRET: OpenAIDetector>",
   },
   {
@@ -109,7 +127,16 @@ const testCases: TestCase[] = [
   },
   {
     name: "SlackDetector (Webhook)",
-    input: "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+    input: s(
+      "https://hooks.slack.com/services/",
+      "T00000000",
+      "/",
+      "B00000000",
+      "/",
+      "XXXXXXXX",
+      "XXXXXXXX",
+      "XXXXXXXX",
+    ),
     expected: "<SECRET: SlackDetector>",
   },
   {
