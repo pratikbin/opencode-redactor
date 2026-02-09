@@ -1,4 +1,4 @@
-import type { Plugin } from "@opencode-ai/plugin";
+type Plugin = (input: any) => Promise<any>;
 
 // NOTE: User requirement: "if you can't detect don't mask it".
 // This implementation prioritizes high-confidence regex detectors and
