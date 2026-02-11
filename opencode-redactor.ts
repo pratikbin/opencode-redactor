@@ -45,6 +45,16 @@ type MaskReport = {
   countsByLabel: Record<string, number>;
 };
 
+type AuditMeta = {
+  hook: "chat.message" | "tool.execute.after";
+  durationMs: number;
+  bytesIn: number;
+  bytesOut?: number;
+  parts?: number;
+  partsChanged?: number;
+  tool?: string;
+};
+
 function bump(report: MaskReport | null, label: string): void {
   if (!report) return;
   report.countsByLabel[label] = (report.countsByLabel[label] || 0) + 1;
@@ -71,7 +81,19 @@ function envTruthy(env: Record<string, unknown>, key: string, defaultValue: bool
   return defaultValue;
 }
 
-async function appendAuditLog(report: MaskReport): Promise<void> {
+function nowMs(): number {
+  // `performance.now()` is monotonic and higher-resolution when available.
+  const p = (globalThis as any).performance;
+  if (p && typeof p.now === "function") return p.now();
+  return Date.now();
+}
+
+function utf8ByteLength(text: string): number {
+  // Exact UTF-8 byte length (used for audit metrics only).
+  return new TextEncoder().encode(text).length;
+}
+
+async function appendAuditLog(report: MaskReport, meta?: AuditMeta): Promise<void> {
   // Best-effort local audit logging. Never throw from here.
   try {
     const BunAny = (globalThis as any).Bun;
@@ -82,21 +104,32 @@ async function appendAuditLog(report: MaskReport): Promise<void> {
       ((globalThis as any).process && (globalThis as any).process.env) ||
       {};
 
-    if (!envTruthy(env, "SECRET_MASKER_AUDIT_ENABLED", true)) return;
+    if (!envTruthy(env, "OPENCODE_REDACTOR_AUDIT_ENABLED", true)) return;
 
     const home = envString(env, "HOME") || envString(env, "USERPROFILE");
     if (!home) return;
 
-    const auditDir = envString(env, "SECRET_MASKER_AUDIT_DIR") || `${home}/.config/opencode`;
-    const auditPath = envString(env, "SECRET_MASKER_AUDIT_PATH") || `${auditDir}/secret-masker.audit.jsonl`;
+    const auditDir = envString(env, "OPENCODE_REDACTOR_AUDIT_DIR") || `${home}/.config/opencode`;
+    const auditPath =
+      envString(env, "OPENCODE_REDACTOR_AUDIT_PATH") || `${auditDir}/opencode-redactor.audit.jsonl`;
 
-    const payload = {
+    const payload: any = {
       ts: new Date().toISOString(),
-      tool: "secret-masker",
+      tool: "opencode-redactor",
       triggered: report.triggered,
       totalMatches: sumCounts(report.countsByLabel),
       countsByLabel: report.countsByLabel,
     };
+
+    if (meta) {
+      payload.hook = meta.hook;
+      payload.durationMs = meta.durationMs;
+      payload.bytesIn = meta.bytesIn;
+      if (typeof meta.bytesOut === "number") payload.bytesOut = meta.bytesOut;
+      if (typeof meta.parts === "number") payload.parts = meta.parts;
+      if (typeof meta.partsChanged === "number") payload.partsChanged = meta.partsChanged;
+      if (typeof meta.tool === "string") payload.toolName = meta.tool;
+    }
     const line = `${JSON.stringify(payload)}\n`;
     const bytes = new TextEncoder().encode(line);
 
@@ -238,12 +271,12 @@ const DETECTORS: Detector[] = [
   // Artifactory (from detect-secrets)
   {
     label: "ArtifactoryDetector",
-    regex: /(?:\s|=|:|"|^)AKC[a-zA-Z0-9]{10,}(?:\s|"|$|[\]\)\}\.,;])/g,
+    regex: /(?:\s|=|:|"|^)AKC[a-zA-Z0-9]{10,}(?:\s|"|$|[\])}.,;])/g,
     replacer: () => mask("ArtifactoryDetector"),
   },
   {
     label: "ArtifactoryDetector",
-    regex: /(?:\s|=|:|"|^)AP[\dABCDEF][a-zA-Z0-9]{8,}(?:\s|"|$|[\]\)\}\.,;])/g,
+    regex: /(?:\s|=|:|"|^)AP[\dABCDEF][a-zA-Z0-9]{8,}(?:\s|"|$|[\])}.,;])/g,
     replacer: () => mask("ArtifactoryDetector"),
   },
 
@@ -255,8 +288,9 @@ const DETECTORS: Detector[] = [
   },
   {
     label: "AWSKeyDetector",
-    regex: /(aws.{0,20}?(?:key|pwd|pw|password|pass|token).{0,20}?[\'\"])([0-9a-zA-Z/+]{40})([\'\"])/gi,
-    replacer: (_m: string, p1: string, _secret: string, p3: string) => `${p1}${mask("AWSKeyDetector")}${p3}`,
+    regex: /(aws.{0,20}?(?:key|pwd|pw|password|pass|token).{0,20}?['"])([0-9a-zA-Z/+]{40})(['"])/gi,
+    replacer: (_m: string, p1: string, _secret: string, p3: string) =>
+      `${p1}${mask("AWSKeyDetector")}${p3}`,
   },
 
   // Azure storage account key (from detect-secrets)
@@ -269,21 +303,24 @@ const DETECTORS: Detector[] = [
   // Cloudant URL (subset of detect-secrets)
   {
     label: "CloudantDetector",
-    regex: /(https?:\/\/)([\w\-]+:)([0-9a-f]{64}|[a-z]{24})(@[\w\-]+\.cloudant\.com)/gi,
-    replacer: (_m: string, p1: string, p2: string, _secret: string, p4: string) => `${p1}${p2}${mask("CloudantDetector")}${p4}`,
+    regex: /(https?:\/\/)([\w-]+:)([0-9a-f]{64}|[a-z]{24})(@[\w-]+\.cloudant\.com)/gi,
+    replacer: (_m: string, p1: string, p2: string, _secret: string, p4: string) =>
+      `${p1}${p2}${mask("CloudantDetector")}${p4}`,
   },
   // Cloudant assignments (subset)
   {
     label: "CloudantDetector",
-    regex: /(\b(?:cloudant|cl|clou)(?:api|)?(?:key|pwd|pw|password|pass|token)\b\s*[:=]\s*)([0-9a-f]{64}|[a-z]{24})\b/gi,
+    regex:
+      /(\b(?:cloudant|cl|clou)(?:api|)?(?:key|pwd|pw|password|pass|token)\b\s*[:=]\s*)([0-9a-f]{64}|[a-z]{24})\b/gi,
     replacer: (_m: string, p1: string) => `${p1}${mask("CloudantDetector")}`,
   },
 
   // Basic auth in URL (from detect-secrets) - mask password only
   {
     label: "BasicAuthDetector",
-    regex: /:\/\/([^:\/\?#\[\]@\s!$&'()*+,;=]+:)([^:\/\?#\[\]@\s!$&'()*+,;=]+)(@)/g,
-    replacer: (_m: string, p1: string, _pw: string, p3: string) => `://${p1}${mask("BasicAuthDetector")}${p3}`,
+    regex: /:\/\/([^:/?#[\]@\s!$&'()*+,;=]+:)([^:/?#[\]@\s!$&'()*+,;=]+)(@)/g,
+    replacer: (_m: string, p1: string, _pw: string, p3: string) =>
+      `://${p1}${mask("BasicAuthDetector")}${p3}`,
   },
 
   // Basic auth header
@@ -310,7 +347,7 @@ const DETECTORS: Detector[] = [
   // GitLab (common prefixes)
   {
     label: "GitLabTokenDetector",
-    regex: /(glpat|gldt|glft|glsoat|glrt)-[A-Za-z0-9_\-]{20,50}(?!\w)/g,
+    regex: /(glpat|gldt|glft|glsoat|glrt)-[A-Za-z0-9_-]{20,50}(?!\w)/g,
     replacer: () => mask("GitLabTokenDetector"),
   },
 
@@ -318,7 +355,7 @@ const DETECTORS: Detector[] = [
   {
     label: "IbmCloudIamDetector",
     regex:
-      /(\b(?:ibm(?:_|-|)cloud(?:_|-|)iam|cloud(?:_|-|)iam|ibm(?:_|-|)cloud|ibm(?:_|-|)iam|ibm|iam|cloud|)?(?:_|-|)?(?:api)?(?:_|-|)?(?:key|pwd|password|pass|token)\b\s*[:=]\s*)([a-zA-Z0-9_\-]{44})(?![a-zA-Z0-9_\-])/gi,
+      /(\b(?:ibm(?:_|-|)cloud(?:_|-|)iam|cloud(?:_|-|)iam|ibm(?:_|-|)cloud|ibm(?:_|-|)iam|ibm|iam|cloud|)?(?:_|-|)?(?:api)?(?:_|-|)?(?:key|pwd|password|pass|token)\b\s*[:=]\s*)([a-zA-Z0-9_-]{44})(?![a-zA-Z0-9_-])/gi,
     replacer: (_m: string, p1: string) => `${p1}${mask("IbmCloudIamDetector")}`,
   },
 
@@ -326,7 +363,7 @@ const DETECTORS: Detector[] = [
   {
     label: "IbmCosHmacDetector",
     regex:
-      /(\b(?:(?:ibm)?[-_]?cos[-_]?(?:hmac)?|)[\w\-]*secret[-_]?(?:access)?[-_]?key\b\s*[:=]\s*)([a-f0-9]{48})(?![a-f0-9])/gi,
+      /(\b(?:(?:ibm)?[-_]?cos[-_]?(?:hmac)?|)[\w-]*secret[-_]?(?:access)?[-_]?key\b\s*[:=]\s*)([a-f0-9]{48})(?![a-f0-9])/gi,
     replacer: (_m: string, p1: string) => `${p1}${mask("IbmCosHmacDetector")}`,
   },
 
@@ -451,11 +488,11 @@ const JWT_REGEX = /\beyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*\b/
 // KeywordDetector: keep this conservative.
 const KEYWORD_VALUE_REGEXES: RegExp[] = [
   // key: "value" / key = 'value'
-  /\b\w*(api_?key|auth_?key|service_?key|account_?key|db_?pass|database_?pass|key_?pass|password|passwd|pwd|secret|token|private_?key|client_?secret)\w*\b\s*[:=]\s*([\'\"`])([^\'\"`\r\n]{4,})\2/gi,
+  /\b\w*(api_?key|auth_?key|service_?key|account_?key|db_?pass|database_?pass|key_?pass|password|passwd|pwd|secret|token|private_?key|client_?secret)\w*\b\s*[:=]\s*(['"`])([^'"`\r\n]{4,})\2/gi,
   // key: value (unquoted)
-  /\b\w*(api_?key|auth_?key|service_?key|account_?key|db_?pass|database_?pass|key_?pass|password|passwd|pwd|secret|token|private_?key|client_?secret)\w*\b\s*[:=]\s*([^\s\"\'`,;]{8,})/gi,
+  /\b\w*(api_?key|auth_?key|service_?key|account_?key|db_?pass|database_?pass|key_?pass|password|passwd|pwd|secret|token|private_?key|client_?secret)\w*\b\s*[:=]\s*([^\s"'`,;]{8,})/gi,
   // password is value
-  /\b\w*(password|passwd|pwd|secret|token|api_?key)\w*\b\s+is\s+([^\s\"\'`,;]{8,})/gi,
+  /\b\w*(password|passwd|pwd|secret|token|api_?key)\w*\b\s+is\s+([^\s"'`,;]{8,})/gi,
 ];
 
 function applyDetectors(input: string, report: MaskReport | null): string {
@@ -499,7 +536,7 @@ function applyDetectors(input: string, report: MaskReport | null): string {
   // High entropy passes
   // 1) quoted strings (we keep this broad, but only mask if the token passes the
   // specific base64/hex entropy checks)
-  text = text.replace(/([\'\"])([^\'\"\r\n]{20,})(\1)/g, (_m, q, body, q2) => {
+  text = text.replace(/(['"])([^'"\r\n]{20,})(\1)/g, (_m, q, body, q2) => {
     const token = String(body);
     if (looksLikeAlreadyMasked(token)) return `${q}${token}${q2}`;
 
@@ -522,7 +559,7 @@ function applyDetectors(input: string, report: MaskReport | null): string {
     const before = fullString.substring(0, offset);
     if (!hasKeywordContext(before)) return token;
 
-    const clean = token.replace(/^['"(\[<{]+|['")\]>}]+$/g, "");
+    const clean = token.replace(/^['"([<{]+|['")\]>}]+$/g, "");
     if (clean.length < MIN_LENGTH_FOR_ENTROPY) return token;
 
     if (hexEntropyPasses(clean)) {
@@ -553,7 +590,7 @@ function maskSecrets(text: unknown): { masked: string; report: MaskReport } {
 const OpenCodeSecretMasker: Plugin = async ({ client }) => {
   await client.app.log({
     body: {
-      service: "secret-masker",
+      service: "opencode-redactor",
       level: "info",
       message: "secret masker plugin initialized",
     },
@@ -563,15 +600,21 @@ const OpenCodeSecretMasker: Plugin = async ({ client }) => {
     // Mask secrets in user-pasted text before it is persisted/sent.
     "chat.message": async (_input, output) => {
       try {
+        const t0 = nowMs();
         const parts = output.parts as any[];
         if (!Array.isArray(parts) || parts.length === 0) return;
 
         let changed = false;
+        let partsChanged = 0;
         let aggregateTriggered = false;
         const aggregateCounts: Record<string, number> = {};
 
+        let bytesIn = 0;
+        let bytesOut = 0;
         const next = parts.map((part) => {
           if (!part || part.type !== "text" || typeof part.text !== "string") return part;
+
+          bytesIn += utf8ByteLength(part.text);
 
           const res = maskSecrets(part.text);
           aggregateTriggered = aggregateTriggered || res.report.triggered;
@@ -579,31 +622,56 @@ const OpenCodeSecretMasker: Plugin = async ({ client }) => {
             aggregateCounts[k] = (aggregateCounts[k] || 0) + (res.report.countsByLabel[k] || 0);
           }
 
+          bytesOut += utf8ByteLength(res.masked);
+
           if (res.masked === part.text) return part;
           changed = true;
+          partsChanged += 1;
           return { ...part, text: res.masked };
         });
 
         if (!changed) return;
         output.parts = next as any;
 
-        await appendAuditLog({ triggered: aggregateTriggered, countsByLabel: aggregateCounts });
+        const t1 = nowMs();
+        await appendAuditLog(
+          { triggered: aggregateTriggered, countsByLabel: aggregateCounts },
+          {
+            hook: "chat.message",
+            durationMs: Math.max(0, t1 - t0),
+            bytesIn,
+            bytesOut,
+            parts: parts.length,
+            partsChanged,
+          },
+        );
       } catch {
         // Best-effort; never break chat.
       }
     },
 
     // Mask secrets introduced by tool outputs (read/grep/bash/etc).
-    "tool.execute.after": async (_input, output) => {
+    "tool.execute.after": async (input, output) => {
       try {
         const raw = (output as any)?.output;
         if (typeof raw !== "string" || raw.length === 0) return;
+
+        const t0 = nowMs();
+        const bytesIn = utf8ByteLength(raw);
 
         const res = maskSecrets(raw);
         if (res.masked === raw) return;
 
         (output as any).output = res.masked;
-        await appendAuditLog(res.report);
+
+        const t1 = nowMs();
+        await appendAuditLog(res.report, {
+          hook: "tool.execute.after",
+          durationMs: Math.max(0, t1 - t0),
+          bytesIn,
+          bytesOut: utf8ByteLength(res.masked),
+          tool: typeof (input as any)?.tool === "string" ? (input as any).tool : undefined,
+        });
       } catch {
         // Best-effort; never break tool execution.
       }

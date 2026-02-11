@@ -1,4 +1,4 @@
-import secretMasker from "./secret-masker";
+import redactor from "./opencode-redactor";
 
 import { describe, expect, test } from "bun:test";
 
@@ -97,7 +97,7 @@ const testCases: TestCase[] = [
   },
   {
     name: "KeywordDetector",
-    input: "password = \"dontlogme\"",
+    input: 'password = "dontlogme"',
     expected: "<SECRET: KeywordDetector>",
   },
   {
@@ -166,29 +166,26 @@ const testCases: TestCase[] = [
   },
   {
     name: "Base64HighEntropyString (quoted)",
-    input:
-      "const x = \"dXNlcm5hbWU6cGFzc3dvcmQxMjM0NTY3ODkwYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=\";",
+    input: 'const x = "dXNlcm5hbWU6cGFzc3dvcmQxMjM0NTY3ODkwYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=";',
     expected: "<SECRET: Base64HighEntropyString>",
   },
   {
     name: "HexHighEntropyString (quoted)",
-    input:
-      "const x = \"7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c\";",
+    input: 'const x = "7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c";',
     expected: "<SECRET: HexHighEntropyString>",
   },
   {
     name: "Entropy WITHOUT Context (unquoted)",
-    input:
-      "This is a random hash 7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c inside a sentence.",
+    input: "This is a random hash 7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c inside a sentence.",
     expected:
       "This is a random hash 7f8a9b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c inside a sentence.",
   },
 ];
 
-describe("secret-masker", () => {
+describe("opencode-redactor", () => {
   for (const tc of testCases) {
     test(tc.name, async () => {
-      const result = (secretMasker as any).maskSecrets(tc.input).masked;
+      const result = (redactor as any).maskSecrets(tc.input).masked;
 
       if (tc.expected === tc.input) {
         expect(result).toBe(tc.expected);

@@ -1,1 +1,1 @@
-export { default } from "./dist/secret-masker.js";
+export { default } from "./dist/opencode-redactor.js";

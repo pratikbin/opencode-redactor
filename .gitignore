@@ -50,8 +50,8 @@ bun.lockb
 *.tmp
 *.bak
 
-# Local secret masker audit logs
-secret-masker.audit.jsonl
+# Local redactor audit logs
+opencode-redactor.audit.jsonl
 
 # Accidental newline-named file created during session
 context-*

@@ -1,7 +1,22 @@
 {
-  "name": "@pratikbin/opencode-secret-masker",
+  "name": "@pratikbin/opencode-redactor",
   "version": "0.1.1",
-  "description": "OpenCode plugin to mask secrets and high-entropy strings before sending to LLM providers",
+  "description": "OpenCode redaction plugin to mask secrets and high-entropy strings before sending to LLM providers",
+  "keywords": [
+    "masking",
+    "opencode",
+    "opencode-plugin",
+    "secrets"
+  ],
+  "license": "MIT",
+  "author": "pratikbin",
+  "files": [
+    "dist/",
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",
@@ -11,28 +26,21 @@
       "default": "./index.js"
     }
   },
-  "files": [
-    "dist/",
-    "index.js",
-    "index.d.ts",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "build": "bun build secret-masker.ts --outdir dist --format esm --target node",
-    "test": "bun test",
-    "prepublishOnly": "bun run build"
-  },
-  "keywords": [
-    "opencode",
-    "opencode-plugin",
-    "secrets",
-    "masking"
-  ],
-  "license": "MIT",
-  "author": "pratikbin",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "build": "bun build opencode-redactor.ts --outdir dist --format esm --target node --minify",
+    "test": "bun test",
+    "format": "oxfmt *.ts",
+    "format:check": "oxfmt --check *.ts",
+    "lint": "oxlint *.ts",
+    "lint:fix": "oxlint --fix *.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.31.0",
+    "oxlint": "^1.46.0"
   },
   "engines": {
     "node": ">=18"
