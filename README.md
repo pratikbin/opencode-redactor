@@ -50,7 +50,7 @@ If you publish/install this plugin from npm, add it to your OpenCode config:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@pratikbin/opencode-redactor@0.1.1"]
+  "plugin": ["opencode-redactor@0.1.1"]
 }
 ```
 

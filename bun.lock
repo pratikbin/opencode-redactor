@@ -3,10 +3,10 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@pratikbin/opencode-redactor",
+      "name": "opencode-redactor",
       "devDependencies": {
-        "oxfmt": "^0.31.0",
-        "oxlint": "^1.46.0",
+        "oxfmt": "latest",
+        "oxlint": "latest",
       },
     },
   },
