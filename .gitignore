@@ -1,0 +1,57 @@
+/.claude/
+/.agents/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cursor / local AI tool artifacts
+.cursor/
+.cursorignore
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Dependencies / runtimes
+node_modules/
+.bun/
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Build / test outputs
+dist/
+build/
+out/
+coverage/
+.cache/
+
+# Bun / npm artifacts
+bun.lockb
+.npmrc
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Tooling artifacts
+.claude_consciousness.*
+*.tmp
+*.bak
+
+# Local redactor audit logs
+opencode-redactor.audit.jsonl
+
+# Accidental newline-named file created during session
+context-*

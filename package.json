@@ -1,0 +1,48 @@
+{
+  "name": "opencode-redactor",
+  "version": "0.1.1",
+  "description": "OpenCode redaction plugin to mask secrets and high-entropy strings before sending to LLM providers",
+  "keywords": [
+    "masking",
+    "opencode",
+    "opencode-plugin",
+    "secrets"
+  ],
+  "license": "MIT",
+  "author": "pratikbin",
+  "files": [
+    "dist/",
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build opencode-redactor.ts --outdir dist --minify --target=bun",
+    "test": "bun test",
+    "format": "oxfmt *.ts",
+    "format:check": "oxfmt --check *.ts",
+    "lint": "oxlint *.ts",
+    "lint:fix": "oxlint --fix *.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.31.0",
+    "oxlint": "^1.46.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
